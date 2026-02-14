@@ -2,7 +2,9 @@
 
 A simple chat-style bot that helps you plan your study schedule.
 
-**Author:** [Krishna Singh](https://github.com/mbrij1429-pixel) · **GitHub:** [@mbrij1429-pixel](https://github.com/mbrij1429-pixel) Add subjects, set weekly hours, and get a suggested daily plan.
+**Author:** [Krishna Singh](https://github.com/mbrij1429-pixel) · **GitHub:** [@mbrij1429-pixel]
+
+Add subjects, set weekly hours, and get a suggested daily plan.
 
 ## What it does
 
