@@ -322,6 +322,19 @@ class StudyPlan:
             lines.append(f"• **{s.name}**: {mins} min")
         return "\n".join(lines)
 
+    def suggest_weekly_schedule(self, study_hours_per_day: float = DEFAULT_STUDY_HOURS_PER_DAY) -> str:
+        """Weekly view: distribute subjects across the week by hours_per_week."""
+        if not self.subjects:
+            return "Add subjects first. Then ask for *weekly plan*."
+        sorted_subs = sorted(self.subjects, key=lambda x: (x.priority, -x.hours_per_week))
+        lines = [f"**This week** (~{study_hours_per_day * 7:.0f}h total):"]
+        for s in sorted_subs:
+            mins_per_day = max(10, int((s.hours_per_week or 1) / 7 * 60))
+            lines.append(f"• **{s.name}**: {s.hours_per_week}h/week → ~{mins_per_day} min/day")
+        lines.append("")
+        lines.append("**Focus:** Mon–Wed high-priority; Thu–Fri catch-up; Sat–Sun revision.")
+        return "\n".join(lines)
+
     def get_todays_tasks(self) -> list[Task]:
         """Pending tasks (not done, not skipped) for today’s focus — by subject from daily plan."""
         pending = [t for t in self.tasks if not t.done and not t.skipped]
@@ -355,6 +368,47 @@ class StudyPlan:
             lines.append(f"• **{e.name}** ({e.subject_name}) — {e.exam_date}{dl_str}")
         return "\n".join(lines)
 
+    def get_revision_plan(self, exam_id: str) -> str:
+        """Spread exam chapters over days left. Exam must have chapters set (e.g. '1-5' or '1,2,3')."""
+        exam = next((e for e in self.exams if e.id == exam_id), None)
+        if not exam:
+            return "Exam not found."
+        days = exam.days_left()
+        if days is None or days <= 0:
+            return f"**{exam.name}** — date passed or invalid. No revision plan."
+        ch = (exam.chapters or "").strip()
+        if not ch:
+            return f"**{exam.name}** — Add chapters first: edit exam or add with *exam ... chapters 1-5*."
+        # Parse chapters: "1-5" -> [1,2,3,4,5], "1,2,3" -> [1,2,3]
+        parts = []
+        for p in ch.replace(",", " ").split():
+            if "-" in p:
+                a, b = p.split("-", 1)
+                try:
+                    parts.extend(range(int(a.strip()), int(b.strip()) + 1))
+                except ValueError:
+                    parts.append(p)
+            else:
+                try:
+                    parts.append(int(p))
+                except ValueError:
+                    parts.append(p)
+        if not parts:
+            parts = [ch]
+        # Spread over days_left (each day 1+ chapters if needed)
+        n = len(parts)
+        per_day = max(1, (n + days - 1) // days)
+        lines = [f"**Revision plan: {exam.name}** — {n} items over {days} days:"]
+        day = 1
+        i = 0
+        while i < n and day <= days:
+            chunk = parts[i : i + per_day]
+            i += len(chunk)
+            ch_str = ", ".join(f"Ch{x}" for x in chunk)
+            lines.append(f"• Day {day}: {ch_str}")
+            day += 1
+        return "\n".join(lines)
+
     # --- Adaptation (simple) ---
     def get_adaptive_study_hours(self) -> float:
         """Reduce load after skips; maintain or slightly increase when streak good."""
@@ -377,6 +431,20 @@ class StudyPlan:
         return "All data cleared. Fresh start."
 
 
+# --- Subject type from chat (coding / college) ---
+SUBJECT_TYPE_KEYWORDS = {
+    "coding": ["coding", "code", "dsa", "programming", "algorithms", "interview", "debugging"],
+    "college": ["college", "theory", "numericals", "derivations"],
+}
+
+
+def _infer_subject_type(rest_lower: str) -> str:
+    for stype, keywords in SUBJECT_TYPE_KEYWORDS.items():
+        if any(kw in rest_lower for kw in keywords):
+            return stype
+    return "general"
+
+
 # --- Command parsing (for chat) ---
 def parse_add_command(text: str) -> dict | None:
     t = text.strip().lower()
@@ -385,6 +453,7 @@ def parse_add_command(text: str) -> dict | None:
     rest = text.strip().split(" add ", 1)[-1].strip().replace("subject", "").replace("topic", "").strip()
     if not rest:
         return None
+    subject_type = _infer_subject_type(rest)
     parts = rest.split()
     name_parts = []
     hours = 0.0
@@ -399,7 +468,7 @@ def parse_add_command(text: str) -> dict | None:
         return None
     if hours == 0:
         hours = 2.0
-    return {"name": name, "hours": hours}
+    return {"name": name, "hours": hours, "subject_type": subject_type}
 
 
 def get_greeting() -> str:

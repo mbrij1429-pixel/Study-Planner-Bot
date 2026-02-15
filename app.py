@@ -42,12 +42,13 @@ def bot_response(user_input: str) -> str:
     text = user_input.strip().lower()
     raw = user_input.strip()
 
-    # Add subject
+    # Add subject (with optional subject_type: coding/college from parse_add_command)
     add_parsed = parse_add_command(raw)
     if add_parsed:
         return plan.add_subject(
             name=add_parsed["name"],
             hours=add_parsed["hours"],
+            subject_type=add_parsed.get("subject_type", "general"),
         )
 
     # Task <subject> <title> [due YYYY-MM-DD]
@@ -70,13 +71,19 @@ def bot_response(user_input: str) -> str:
     if skip_match:
         return plan.skip_task(skip_match.group(1).strip())
 
-    # Exam <name> <subject> <date>
-    exam_match = re.match(r"exam\s+(.+?)\s+(\S+)\s+(\d{4}-\d{2}-\d{2})", raw, re.I)
+    # Revision plan <exam_id>
+    rev_match = re.match(r"revision\s+(?:plan\s+)?(\w+)", text)
+    if rev_match:
+        return plan.get_revision_plan(rev_match.group(1).strip())
+
+    # Exam <name> <subject> <date> [chapters 1-5]
+    exam_match = re.match(r"exam\s+(.+?)\s+(\S+)\s+(\d{4}-\d{2}-\d{2})(?:\s+chapters\s+(.+))?$", raw, re.I)
     if exam_match:
         name = exam_match.group(1).strip()
         subj = exam_match.group(2).strip()
         d = exam_match.group(3).strip()
-        return plan.add_exam(name, subj, d)
+        chapters = (exam_match.group(4) or "").strip()
+        return plan.add_exam(name, subj, d, chapters=chapters)
 
     # List / show
     if any(x in text for x in ("list subjects", "show subjects", "subjects", "what are my subjects")):
@@ -87,6 +94,11 @@ def bot_response(user_input: str) -> str:
         return plan.list_exams()
     if "stats" in text or "level" in text or "points" in text or "streak" in text:
         return plan.get_stats_text()
+
+    # Weekly plan
+    if any(x in text for x in ("weekly", "week plan", "this week")):
+        hours = plan.get_adaptive_study_hours()
+        return plan.suggest_weekly_schedule(study_hours_per_day=hours)
 
     # Schedule / daily plan
     if any(x in text for x in ("schedule", "daily", "plan for today", "today", "plan")):
@@ -102,8 +114,8 @@ def bot_response(user_input: str) -> str:
         return get_greeting()
 
     return (
-        "Unclear. Use: *add &lt;subject&gt; &lt;hours&gt;*, *schedule*, *task &lt;subject&gt; &lt;title&gt;*, "
-        "*tasks*, *done &lt;id&gt;*, *skip &lt;id&gt;*, *exam ...*, *exams*, *stats*, *clear*."
+        "Unclear. Use: *add &lt;subject&gt; &lt;hours&gt;*, *schedule*, *weekly*, *task ...*, *tasks*, "
+        "*done/skip &lt;id&gt;*, *exam ...*, *revision plan &lt;exam_id&gt;*, *exams*, *stats*, *clear*."
     )
 
 
