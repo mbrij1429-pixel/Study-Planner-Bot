@@ -6,6 +6,7 @@ import re
 import streamlit as st
 from planner import (
     StudyPlan,
+    explain_topic,
     get_greeting,
     parse_add_command,
 )
@@ -100,10 +101,16 @@ def bot_response(user_input: str) -> str:
         hours = plan.get_adaptive_study_hours()
         return plan.suggest_weekly_schedule(study_hours_per_day=hours)
 
-    # Schedule / daily plan
+    # Explain <topic>
+    explain_match = re.match(r"explain\s+(.+)", text)
+    if explain_match:
+        return explain_topic(explain_match.group(1).strip())
+
+    # Schedule / daily plan (with strict note if plan reduced)
     if any(x in text for x in ("schedule", "daily", "plan for today", "today", "plan")):
         hours = plan.get_adaptive_study_hours()
-        return plan.suggest_daily_schedule(study_hours_per_day=hours)
+        out = plan.suggest_daily_schedule(study_hours_per_day=hours)
+        return out + plan.get_schedule_strict_note()
 
     # Clear / reset
     if "clear" in text or "reset" in text:
@@ -114,8 +121,8 @@ def bot_response(user_input: str) -> str:
         return get_greeting()
 
     return (
-        "Unclear. Use: *add &lt;subject&gt; &lt;hours&gt;*, *schedule*, *weekly*, *task ...*, *tasks*, "
-        "*done/skip &lt;id&gt;*, *exam ...*, *revision plan &lt;exam_id&gt;*, *exams*, *stats*, *clear*."
+        "Unclear. Use: *add*, *schedule*, *weekly*, *task*, *tasks*, *done/skip &lt;id&gt;*, "
+        "*exam*, *exams*, *revision plan &lt;id&gt;*, *explain &lt;topic&gt;*, *stats*, *clear*."
     )
 
 
