@@ -293,6 +293,10 @@ class StudyPlan:
                 return f"Done. **+{points} pts** | Streak: {self.user_stats.current_streak} | Level {self.user_stats.level()}."
         return "Task not found."
 
+    def _recent_skips(self) -> int:
+        """Number of skips in last 14 days (for stricter messaging)."""
+        return sum(1 for x in self.behavior_log[-14:] if x.get("action") == "skip")
+
     def skip_task(self, task_id: str) -> str:
         for t in self.tasks:
             if t.id == task_id:
@@ -307,6 +311,9 @@ class StudyPlan:
                     "title": t.title,
                 })
                 self._save()
+                n = self._recent_skips()
+                if n >= 3:
+                    return f"Skipped. **{POINTS_PER_SKIP_PENALTY} pts.** You have skipped {n} times recently. Next skip will reduce your daily plan. Do the next task."
                 return f"Skipped. **{POINTS_PER_SKIP_PENALTY} pts.** Stay consistent."
         return "Task not found."
 
@@ -361,11 +368,11 @@ class StudyPlan:
     def list_exams(self) -> str:
         if not self.exams:
             return "No exams. Add: *exam &lt;name&gt; &lt;subject&gt; &lt;YYYY-MM-DD&gt;*."
-        lines = ["**Exams:**"]
+        lines = ["**Exams:** (use *revision plan &lt;id&gt;* for chapter spread)"]
         for e in self.exams:
             dl = e.days_left()
             dl_str = f" — {dl} days left" if dl is not None else ""
-            lines.append(f"• **{e.name}** ({e.subject_name}) — {e.exam_date}{dl_str}")
+            lines.append(f"• **{e.name}** ({e.subject_name}) — {e.exam_date}{dl_str} `{e.id}`")
         return "\n".join(lines)
 
     def get_revision_plan(self, exam_id: str) -> str:
@@ -421,6 +428,12 @@ class StudyPlan:
             return min(6.0, DEFAULT_STUDY_HOURS_PER_DAY + 0.5)
         return DEFAULT_STUDY_HOURS_PER_DAY
 
+    def get_schedule_strict_note(self) -> str:
+        """When consistency is low, return a one-line strict note to append to schedule."""
+        if self._recent_skips() >= 3:
+            return "\n\n⚠️ **Your plan is reduced** — complete tasks to restore full hours."
+        return ""
+
     def clear(self) -> str:
         self.subjects.clear()
         self.tasks.clear()
@@ -471,6 +484,46 @@ def parse_add_command(text: str) -> dict | None:
     return {"name": name, "hours": hours, "subject_type": subject_type}
 
 
+# --- Explain topic (exam-oriented key points) ---
+CONCEPT_BANK: dict[str, list[str]] = {
+    "array": [
+        "**Array** — contiguous memory; O(1) access by index; fixed size (or dynamic in some languages).",
+        "Exam: traversal, two-pointer, prefix sum, sliding window.",
+    ],
+    "dsa": [
+        "**DSA** — Data Structures (array, linked list, stack, queue, tree, graph, hash) + Algorithms (sort, search, recursion, DP).",
+        "Exam: identify structure → choose algorithm → code with edge cases.",
+    ],
+    "recursion": [
+        "**Recursion** — base case + recurrence; stack holds state; convert to iteration via stack/queue.",
+        "Exam: tree/graph DFS, divide-and-conquer, backtracking.",
+    ],
+    "dynamic programming": [
+        "**DP** — optimal substructure + overlapping subproblems; memoize or tabulate; state = (index, constraint).",
+        "Exam: state definition, transition, base case, order of fill.",
+    ],
+    "linked list": [
+        "**Linked list** — node (data, next); O(1) insert/delete at head; need pointer for middle; cycle detection = fast/slow.",
+        "Exam: reverse, merge, find middle, detect cycle.",
+    ],
+    "sorting": [
+        "**Sorting** — comparison: Merge O(n log n), Quick average O(n log n); non-comparison: Count, Radix.",
+        "Exam: when stable matters; in-place; time/space trade-off.",
+    ],
+}
+
+
+def explain_topic(topic: str) -> str:
+    """Return exam-oriented key points for a topic. Fuzzy match on CONCEPT_BANK keys."""
+    t = topic.strip().lower()
+    if not t:
+        return "Say *explain &lt;topic&gt;* — e.g. explain array, explain recursion, explain DP."
+    for key, points in CONCEPT_BANK.items():
+        if key in t or t in key:
+            return "**" + key.title() + "** (exam focus):\n\n" + "\n\n".join(points)
+    return f"No notes for \"{topic}\". Try: array, DSA, recursion, dynamic programming, linked list, sorting."
+
+
 def get_greeting() -> str:
     return (
         "**Ultimate AI Study Planner Bot** — I plan, you execute.\n\n"
@@ -481,6 +534,7 @@ def get_greeting() -> str:
         "• *Exam &lt;name&gt; &lt;subject&gt; &lt;date&gt;* — add exam\n"
         "• *Exams* — list · *Revision plan &lt;exam_id&gt;* — spread chapters over days left\n"
         "• *Weekly* — this week's plan\n"
+        "• *Explain &lt;topic&gt;* — e.g. explain array, explain DP\n"
         "• *Stats* — points, level, streak · *Clear* — reset all\n\n"
         "What do you want to do?"
     )
