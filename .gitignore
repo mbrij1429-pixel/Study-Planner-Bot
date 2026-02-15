@@ -9,6 +9,9 @@ __pycache__/
 .env
 .env.local
 
+# Data (user-specific, do not commit)
+study_plan_data.json
+
 # IDE
 .idea/
 .vscode/
