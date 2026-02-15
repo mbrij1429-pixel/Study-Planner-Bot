@@ -479,8 +479,8 @@ def get_greeting() -> str:
         "• *Task &lt;subject&gt; &lt;title&gt;* — add a task\n"
         "• *Tasks* — list tasks; *done &lt;id&gt;* / *skip &lt;id&gt;*\n"
         "• *Exam &lt;name&gt; &lt;subject&gt; &lt;date&gt;* — add exam\n"
-        "• *Exams* — list exams and days left\n"
-        "• *Stats* — points, level, streak\n"
-        "• *Clear* — reset all data\n\n"
+        "• *Exams* — list · *Revision plan &lt;exam_id&gt;* — spread chapters over days left\n"
+        "• *Weekly* — this week's plan\n"
+        "• *Stats* — points, level, streak · *Clear* — reset all\n\n"
         "What do you want to do?"
     )

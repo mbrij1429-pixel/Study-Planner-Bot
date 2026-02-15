@@ -122,7 +122,8 @@ def bot_response(user_input: str) -> str:
 # ----- Sidebar: stats + today's tasks -----
 with st.sidebar:
     st.markdown("### 📊 Your stats")
-    st.markdown(f'<div class="stat-box"><div class="stat-label">Level · Points · Streak</div><div class="stat-value">{plan.get_stats_text().replace("**", "")}</div></div>', unsafe_allow_html=True)
+    stats_text = plan.get_stats_text().replace("**", "")
+    st.caption(stats_text)
     st.markdown("---")
     st.markdown("### 📋 Today's tasks")
     todays = plan.get_todays_tasks()
